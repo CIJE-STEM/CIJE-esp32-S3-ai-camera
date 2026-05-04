@@ -1,0 +1,159 @@
+# Web Flasher Setup - Visual Guide
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    WHAT YOU HAVE NOW                        │
+└─────────────────────────────────────────────────────────────┘
+
+web_flasher_package/
+├── ✅ index.html              (Web installer - READY)
+├── ✅ manifest.json           (Configuration - READY)
+├── ✅ Documentation           (All guides - READY)
+├── ✅ Test servers            (Scripts - READY)
+└── ❌ firmware/               (EMPTY - NEEDS BINARIES)
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                    WHAT YOU NEED TO DO                      │
+└─────────────────────────────────────────────────────────────┘
+
+STEP 1: Open Arduino IDE
+    │
+    ├── Load: ESP32_AI_Camera_v3_0_0.ino
+    ├── Configure: ESP32S3 Dev Module settings
+    └── Export: Sketch → Export Compiled Binary
+         │
+         ├─→ Generates 3 files in build/ folder:
+         │    • ESP32_AI_Camera_v3_0_0.ino.bootloader.bin
+         │    • ESP32_AI_Camera_v3_0_0.ino.partitions.bin
+         │    • ESP32_AI_Camera_v3_0_0.ino.bin
+         │
+         └─→ Find 1 more file in Arduino15/ folder:
+              • boot_app0.bin
+
+
+STEP 2: Copy & Rename
+    │
+    └── Copy to web_flasher_package/firmware/:
+         │
+         ├── ESP32_AI_Camera_v3_0_0.ino.bootloader.bin  →  bootloader.bin
+         ├── ESP32_AI_Camera_v3_0_0.ino.partitions.bin  →  partitions.bin
+         ├── ESP32_AI_Camera_v3_0_0.ino.bin             →  firmware.bin
+         └── boot_app0.bin                              →  boot_app0.bin
+
+
+STEP 3: Test
+    │
+    ├── Run: start_server.bat (Windows) or start_server.sh (Mac/Linux)
+    ├── Open: http://localhost:8000
+    ├── Connect: ESP32-S3 via USB
+    └── Click: "Install AI Camera Firmware"
+
+
+STEP 4: Deploy (Optional)
+    │
+    ├── GitHub Pages: Upload to repo, enable Pages
+    ├── Netlify: Drag & drop folder
+    └── Share URL with users!
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                    FINAL RESULT                             │
+└─────────────────────────────────────────────────────────────┘
+
+web_flasher_package/
+├── ✅ index.html              (Web installer)
+├── ✅ manifest.json           (Configuration)
+├── ✅ firmware/
+│   ├── ✅ bootloader.bin      (~26 KB)
+│   ├── ✅ partitions.bin      (~3 KB)
+│   ├── ✅ boot_app0.bin       (~4 KB)
+│   └── ✅ firmware.bin        (~1.3 MB)
+└── ✅ Documentation           (Guides)
+
+🎉 READY TO USE!
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                    USER EXPERIENCE                          │
+└─────────────────────────────────────────────────────────────┘
+
+User visits your URL
+    │
+    ├── Sees beautiful installer page
+    ├── Clicks "Install" button
+    ├── Selects ESP32 device
+    ├── Waits 2-3 minutes
+    └── Done! Device ready to use
+
+NO Arduino IDE needed!
+NO configuration files!
+NO technical knowledge required!
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                    FILE LOCATIONS                           │
+└─────────────────────────────────────────────────────────────┘
+
+WHERE TO FIND BINARIES AFTER EXPORT:
+
+Windows:
+    Documents\Arduino\ESP32_AI_Camera_v3_0_0\build\esp32.esp32.esp32s3\
+    └── Contains: bootloader.bin, partitions.bin, firmware.bin
+
+    C:\Users\[You]\AppData\Local\Arduino15\packages\esp32\hardware\esp32\3.3.6\tools\partitions\
+    └── Contains: boot_app0.bin
+
+Mac:
+    ~/Documents/Arduino/ESP32_AI_Camera_v3_0_0/build/esp32.esp32.esp32s3/
+    └── Contains: bootloader.bin, partitions.bin, firmware.bin
+
+    ~/Library/Arduino15/packages/esp32/hardware/esp32/3.3.6/tools/partitions/
+    └── Contains: boot_app0.bin
+
+Linux:
+    ~/Arduino/ESP32_AI_Camera_v3_0_0/build/esp32.esp32.esp32s3/
+    └── Contains: bootloader.bin, partitions.bin, firmware.bin
+
+    ~/.arduino15/packages/esp32/hardware/esp32/3.3.6/tools/partitions/
+    └── Contains: boot_app0.bin
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                    QUICK REFERENCE                          │
+└─────────────────────────────────────────────────────────────┘
+
+COMPILE FIRMWARE:
+    Arduino IDE → Sketch → Export Compiled Binary
+
+FIND FILES:
+    Check your sketch folder's build/ subdirectory
+    + Arduino15 folder for boot_app0.bin
+
+COPY FILES:
+    All 4 .bin files go in: web_flasher_package/firmware/
+
+TEST:
+    ./start_server.sh (or .bat)
+    Open: http://localhost:8000
+
+DEPLOY:
+    Upload to GitHub Pages or Netlify
+    Share URL with users
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                    NEED HELP?                               │
+└─────────────────────────────────────────────────────────────┘
+
+📖 START_HERE.md         - Complete setup instructions
+📖 BUILD_GUIDE.md        - Detailed build guide
+📖 QUICK_START.md        - Fast setup reference
+📖 firmware/README.md    - Binary generation guide
+
+Still stuck? Check that:
+1. You clicked "Export Compiled Binary" not just "Verify"
+2. All 4 files (.ino + 3 .h) were in same folder
+3. Board settings match exactly
+4. ESP32 board package is installed
+```

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32-S3 AI Camera – Interface Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    /* ── CIJE Brand Palette ── */
+    --navy: #0B2545;
+    --navy-mid: #163560;
+    --navy-light: #1e4a80;
+    --gold: #C9A227;
+    --gold-light: #E2B93B;
+    --gold-pale: #f5e9c0;
+    --white: #FFFFFF;
+    --off-white: #F7F8FA;
+    --gray-100: #edf0f4;
+    --gray-200: #d6dce6;
+    --gray-400: #7a8fa8;
+    /* UI accent colors — desaturated to harmonize with CIJE navy/gold */
+    --green: #1d8f5e;
+    --green-dark: #166a46;
+    --teal: #1a6e8f;
+    --teal-dark: #145470;
+    --orange: #b8721a;
+    --orange-dark: #8f5510;
+    --red: #b83232;
+    --purple: #3d4fa8;
+    --tooltip-bg: #0B2545;
+    --tooltip-border: #C9A227;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(135deg, #071a36 0%, #0B2545 50%, #071a36 100%);
+    min-height: 100vh;
+    color: var(--white);
+    padding: 0;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    background: linear-gradient(90deg, var(--navy) 0%, var(--navy-mid) 100%);
+    border-bottom: 2px solid var(--gold);
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+  }
+  .page-header .logo-block { display: flex; align-items: center; gap: 14px; }
+  .logo-mark {
+    width: 40px; height: 40px;
+    background: var(--gold);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: var(--navy);
+  }
+  .page-header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
+  .page-header .subtitle { font-size: 12px; color: var(--gold-light); font-weight: 400; margin-top: 2px; }
+  .badge {
+    background: var(--gold);
+    color: var(--navy);
+    font-size: 11px; font-weight: 700;
+    padding: 3px 10px; border-radius: 20px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Main layout ── */
+  .page-body {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 36px 28px 60px;
+  }
+
+  .intro {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .intro h2 { font-size: 28px; font-weight: 700; color: var(--white); }
+  .intro p { font-size: 14px; color: var(--gray-400); margin-top: 8px; max-width: 560px; margin-left: auto; margin-right: auto; }
+  .hint-tag {
+    display: inline-block;
+    margin-top: 12px;
+    background: rgba(201,162,39,.15);
+    border: 1px solid rgba(201,162,39,.4);
+    color: var(--gold-light);
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 20px;
+  }
+
+  /* ── UI mock frame ── */
+  .ui-frame {
+    background: #fff;
+    border-radius: 12px;
+    overflow: visible;
+    box-shadow: 0 20px 80px rgba(0,0,0,.6);
+    color: #222;
+    position: relative;
+  }
+
+  /* browser chrome strip */
+  .browser-bar {
+    background: #f1f3f4;
+    border-bottom: 1px solid #d0d5dd;
+    padding: 9px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 12px 12px 0 0;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; }
+  .dot.y { background: #ffbd2e; }
+  .dot.g { background: #28c840; }
+  .url-bar {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #555;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .not-secure { font-size: 11px; color: #888; display: flex; align-items: center; gap: 4px; }
+  .lock-icon { font-size: 11px; }
+
+  /* ── App content ── */
+  .app-content {
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto auto;
+    gap: 12px;
+  }
+
+  /* workflow banner */
+  .workflow-banner {
+    grid-column: 1 / -1;
+    background: #fffbeb;
+    border: 1px solid #f0c040;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 12.5px;
+    color: #7a5c00;
+    position: relative;
+  }
+  .workflow-banner strong { font-weight: 600; }
+
+  /* left panel */
+  .left-panel { display: flex; flex-direction: column; gap: 10px; }
+
+  .controls-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* video area */
+  .video-area {
+    background: #1a1a2e;
+    border-radius: 8px;
+    aspect-ratio: 4/3;
+    position: relative;
+    overflow: hidden;
+    flex: 1;
+  }
+  .video-placeholder {
+    width: 100%; height: 100%;
+    background: linear-gradient(160deg, #232b4a 0%, #1a1a2e 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .camera-icon-big {
+    font-size: 48px;
+    opacity: 0.15;
+  }
+  .live-badge {
+    position: absolute;
+    top: 10px; left: 10px;
+    background: #C9A227;
+    color: #0B2545;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    background: #0B2545;
+    border-radius: 50%;
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* right panel */
+  .right-panel { display: flex; flex-direction: column; gap: 10px; }
+
+  .panel-card {
+    background: #f8f9fa;
+    border: 1px solid #e2e6ea;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .panel-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #C9A227;
+    padding-bottom: 6px;
+  }
+
+  /* audio playback */
+  .audio-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 8px;
+  }
+  .play-btn { font-size: 14px; color: #666; cursor: pointer; }
+  .progress-bar {
+    flex: 1;
+    height: 3px;
+    background: #ddd;
+    border-radius: 2px;
+  }
+  .time { font-size: 11px; color: #888; white-space: nowrap; }
+  .vol-icon { font-size: 14px; color: #666; }
+
+  .audio-btns { display: flex; gap: 8px; }
+
+  /* Export panes */
+  .export-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .export-pane {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px;
+  }
+  .export-pane h4 {
+    font-size: 11px;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #C9A227;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+  }
+  .export-none {
+    font-size: 11px;
+    color: #aaa;
+    text-align: center;
+    padding: 8px 0;
+  }
+
+  /* file list */
+  .files-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    grid-column: 1 / -1;
+  }
+  .file-pane {
+    background: #f8f9fa;
+    border: 1px solid #e2e6ea;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .file-pane h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #C9A227;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+  }
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+  .file-item {
+    font-size: 11.5px;
+    color: #555;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    cursor: pointer;
+  }
+  .file-item:hover { background: #f5efd4; }
+  .file-item.selected { background: #f5e9c0; border-color: #C9A227; }
+
+  .file-btns { display: flex; flex-direction: column; gap: 5px; }
+  .file-action-row { display: flex; gap: 5px; }
+
+  /* results / bottom */
+  .results-area {
+    grid-column: 1 / -1;
+    background: #f8f9fa;
+    border: 1px solid #e2e6ea;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .results-area h3 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
+  .results-box {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 12px;
+    color: #aaa;
+    min-height: 70px;
+  }
+
+  .bottom-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    border: none;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12.5px;
+    padding: 7px 14px;
+    transition: filter .15s, transform .1s;
+    position: relative;
+  }
+  .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+
+  .btn-green  { background: #1d8f5e; color: #fff; }
+  .btn-purple { background: #3d4fa8; color: #fff; }
+  .btn-teal   { background: #1a6e8f; color: #fff; }
+  .btn-orange { background: #b8721a; color: #fff; }
+  .btn-red    { background: #b83232; color: #fff; }
+  .btn-navy   { background: #0B2545; color: #fff; flex: 1; }
+  .btn-sm     { font-size: 11px; padding: 5px 10px; }
+  .btn-delete { background: #f5e9c0; color: #7a4800; width: 100%; margin-top: 4px; }
+  .btn-full   { width: 100%; }
+  .btn-export { background: #C9A227; color: #0B2545; font-weight: 700; }
+
+  /* ── Tooltip system ── */
+  [data-tip] { position: relative; cursor: help; }
+
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--tooltip-bg);
+    border: 1.5px solid var(--tooltip-border);
+    color: #f0f0f0;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    width: 240px;
+    max-width: 280px;
+    white-space: normal;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    transform: translateX(-50%) translateY(4px);
+    z-index: 9999;
+  }
+
+  /* arrow */
+  [data-tip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--tooltip-border);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 9999;
+  }
+
+  [data-tip]:hover::after,
+  [data-tip]:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* flip tooltips on bottom-row items */
+  [data-tip][data-pos="above"]::after { bottom: calc(100% + 10px); top: auto; }
+  [data-tip][data-pos="below"]::after {
+    top: calc(100% + 10px);
+    bottom: auto;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  [data-tip][data-pos="below"]:hover::after { transform: translateX(-50%) translateY(0); }
+  [data-tip][data-pos="below"]::before {
+    top: calc(100% + 4px); bottom: auto;
+    border-top-color: transparent;
+    border-bottom-color: var(--tooltip-border);
+  }
+  [data-tip][data-pos="left"]::after { left: auto; right: calc(100% + 10px); bottom: 50%; transform: translateY(50%) translateX(-4px); }
+  [data-tip][data-pos="left"]:hover::after { transform: translateY(50%) translateX(0); }
+  [data-tip][data-pos="left"]::before { display: none; }
+
+  /* tooltip accent header */
+  [data-tip]::after { /* rendered in data-tip attribute directly */ }
+
+  /* ── Highlight ring on hover ── */
+  [data-tip]:hover {
+    outline: 2px solid rgba(201,162,39,.7);
+    outline-offset: 2px;
+    border-radius: 5px;
+    z-index: 10;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  .legend-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .legend-card h4 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .legend-item p { font-size: 12.5px; color: var(--gray-200); line-height: 1.45; }
+  .legend-item strong { color: var(--white); }
+
+  /* Footer */
+  .page-footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 11px;
+    color: var(--gray-400);
+    border-top: 1px solid rgba(255,255,255,.07);
+    margin-top: 40px;
+  }
+  .page-footer span { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="page-header">
+  <div class="logo-block">
+    <div class="logo-mark">C</div>
+    <div>
+      <div class="page-header h1" style="font-size:17px;font-weight:700;">ESP32-S3 AI Camera</div>
+      <div class="subtitle">Interactive Interface Reference Guide</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="font-size:12px;color:var(--gray-400);">Hover any element for details</span>
+    <span class="badge">CIJE</span>
+  </div>
+</header>
+
+<div class="page-body">
+
+  <div class="intro">
+    <h2>Web Interface – Annotated Reference</h2>
+    <p>A live recreation of the AI Camera's web interface. Hover over any button, panel, or control to see what it does.</p>
+    <span class="hint-tag">✦ Hover any highlighted element to see its tooltip</span>
+  </div>
+
+  <!-- The UI mock -->
+  <div class="ui-frame">
+    <!-- browser chrome -->
+    <div class="browser-bar">
+      <div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+      <div class="not-secure"><span class="lock-icon">⚠</span> Not secure</div>
+      <div class="url-bar">192.168.0.181</div>
+    </div>
+
+    <!-- App content -->
+    <div class="app-content">
+
+      <!-- Workflow banner -->
+      <div class="workflow-banner" data-tip="This banner shows the recommended workflow: (1) Capture an image and/or record audio, (2) use Save to Export or Add to Export to mark the files, (3) click Send to OpenAI to run the analysis. Arrow symbols show each step in the sequence." data-pos="below">
+        <strong>Pairing Workflow:</strong> Capture image/audio → Save to export → Send to OpenAI agent
+      </div>
+
+      <!-- Left panel -->
+      <div class="left-panel">
+
+        <!-- Controls -->
+        <div class="controls-row">
+          <button class="btn btn-green" data-tip="Stops the live camera stream to save bandwidth and processing power. Click again (Start Stream) to resume the live feed. Stopping the stream does NOT affect saved images.">Stop Stream</button>
+          <button class="btn btn-purple" data-tip="Takes a single still image from the live camera feed and saves it to the SD card as IMG_XX.jpg. The file counter increments automatically. You can capture multiple images for a multi-image analysis (up to 5).">Capture</button>
+          <button class="btn btn-teal" data-tip="Opens the Review panel where you can browse all captured images saved on the SD card. Useful for selecting which images to add to the Export queue before sending to OpenAI.">Review</button>
+        </div>
+
+        <!-- Video -->
+        <div class="video-area" data-tip="Live camera stream from the OV3660 wide-angle camera. The stream runs as MJPEG over WiFi. Resolution and quality can be adjusted in firmware settings. The camera has a 160° field of view and includes infrared LEDs for low-light use.">
+          <div class="video-placeholder">
+            <div class="camera-icon-big">📷</div>
+          </div>
+          <div class="live-badge" data-tip="Gold LIVE indicator confirms the camera stream is actively transmitting frames. If this is missing, check WiFi connection or click Start Stream.">
+            <div class="live-dot"></div> LIVE
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right panel -->
+      <div class="right-panel">
+
+        <!-- Audio playback card -->
+        <div class="panel-card" data-tip="The Audio Playback Bar lets you preview any WAV file stored on the SD card. Select a file from the Audio Files list, then use the play controls to listen back before sending it to OpenAI as a voice prompt.">
+          <h3>Audio Playback Bar</h3>
+          <div class="audio-player">
+            <span class="play-btn">▶</span>
+            <span class="time">0:00 / 0:00</span>
+            <div class="progress-bar"></div>
+            <span class="vol-icon">🔊</span>
+            <span style="font-size:13px;color:#888;">⋮</span>
+          </div>
+          <div class="audio-btns">
+            <button class="btn btn-red" data-tip="Starts recording audio from the onboard PDM microphone (GPIO 38/39). Recording runs in blocking mode — the ESP32 captures audio until you press Stop. The file is saved as REC_XX.wav on the SD card. Use this to record your spoken analysis prompt.">Record</button>
+            <button class="btn btn-green" data-tip="Toggles audio playback through the MAX98357A speaker amplifier. When enabled, the TTS (Text-to-Speech) response from OpenAI will play automatically after analysis completes. When disabled, TTS audio is saved but not played aloud.">Speaker</button>
+          </div>
+        </div>
+
+        <!-- Export panes -->
+        <div class="export-grid">
+          <div class="export-pane" data-tip="Shows the image currently queued for export/analysis. After selecting an image in the Image Files list, click 'Add to Export' to stage it here. Only staged files are included when you click Send to OpenAI.">
+            <h4>Image for Export</h4>
+            <div class="export-none">None selected</div>
+          </div>
+          <div class="export-pane" data-tip="Shows the audio file currently queued for export/analysis. After selecting a WAV in the Audio Files list, click 'Add to Export' to stage it here. This audio is transcribed via Whisper and used as the prompt sent alongside your image(s).">
+            <h4>Audio for Export</h4>
+            <div class="export-none">None selected</div>
+          </div>
+        </div>
+
+        <!-- File panes (in the right panel) -->
+        <div class="panel-card" data-tip="Resources panel shows all files stored on the SD card, split into Image Files and Audio Files. Click a filename to select it, then use the action buttons below to manage it.">
+          <h3>Image Files (Resources)</h3>
+          <div class="file-list">
+            <div class="file-item selected" data-tip="A captured JPEG image stored on the SD card. Click to select it, then use Add to Export or Save to PC. The number increments each capture (IMG_17, IMG_18 …).">IMG_17.jpg</div>
+            <div class="file-item" data-tip="Second captured image. You can send up to 5 images simultaneously to GPT-4 Vision for multi-image analysis.">IMG_18.jpg</div>
+            <div class="file-item" data-tip="Third captured image. Selecting multiple images for export enables comparative analysis — e.g., 'Compare these two specimens.'">IMG_19.jpg</div>
+          </div>
+          <div class="file-action-row">
+            <button class="btn btn-teal btn-sm" style="flex:1" data-tip="Adds the currently selected image to the Image for Export queue. The file stays on the SD card — this just marks it to be included in the next OpenAI request.">Add to Export</button>
+            <button class="btn btn-green btn-sm" style="flex:1" data-tip="Downloads the selected image from the SD card to your computer via the browser. Useful for saving evidence, student work, or reference photos outside the device.">Save to PC</button>
+          </div>
+          <button class="btn btn-delete btn-sm" data-tip="Permanently deletes the selected file from the SD card. This action cannot be undone. Use with caution — the counter does NOT reset after deletion.">Delete File</button>
+        </div>
+
+      </div>
+
+      <!-- Audio files pane — full width under right panel (mimicking layout) -->
+      <!-- Results area -->
+      <div class="results-area">
+        <h3 data-tip="After you click Send to OpenAI, this box shows the AI-generated text response from GPT-4 Vision. Analysis typically takes 60–90 seconds. The ESP32 returns HTTP 202 immediately and processes in the background — this box auto-updates when the result is ready.">OpenAI Analysis Results</h3>
+        <div class="results-box" data-tip="GPT-4 Vision analysis text appears here. The response is based on your image(s) plus the Whisper-transcribed audio prompt. After the text appears, the Text-to-Speech (TTS) audio is generated and played automatically if Speaker is on.">
+          OpenAI analysis with TTS will appear here...
+        </div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div class="bottom-bar">
+        <button class="btn btn-navy" data-tip="Sends the staged image(s) and audio prompt to OpenAI's API. The image is analyzed by GPT-4 Vision; the audio prompt is first transcribed by Whisper and used to guide the analysis. Results appear in the box above. Processing takes 60–90 seconds — do not refresh the page during this time." data-pos="above">Send to OpenAI</button>
+        <button class="btn btn-navy" data-tip="Replays the most recent TTS (Text-to-Speech) audio response through the speaker without re-running the OpenAI analysis. Useful for classrooms where the teacher wants to replay the AI's spoken response for the group." data-pos="above">Replay TTS</button>
+        <button class="btn btn-export" data-tip="Bundles the staged image(s), audio file, and the analysis text result into a single ZIP package and downloads it to your computer. This export is ideal for including in student portfolios, lesson documentation, or sharing with colleagues." data-pos="above">Export Package</button>
+      </div>
+
+    </div><!-- /app-content -->
+  </div><!-- /ui-frame -->
+
+  <!-- Legend -->
+  <div class="legend">
+
+    <div class="legend-card">
+      <h4>Camera Controls</h4>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0B2545;"></div>
+        <p><strong>Stop/Start Stream</strong> — Toggles live MJPEG feed from the OV3660 camera.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#163560;"></div>
+        <p><strong>Capture</strong> — Saves a still frame to SD card as IMG_XX.jpg.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#1e4a80;"></div>
+        <p><strong>Review</strong> — Browse previously captured images on the SD card.</p>
+      </div>
+    </div>
+
+    <div class="legend-card">
+      <h4>Audio Controls</h4>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#8B1A1A;"></div>
+        <p><strong>Record</strong> — Records from the onboard PDM mic to REC_XX.wav on SD.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0B2545;"></div>
+        <p><strong>Speaker</strong> — Enables/disables TTS playback via MAX98357A amp.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#1e4a80;"></div>
+        <p><strong>Playback Bar</strong> — Preview any saved WAV file before sending to OpenAI.</p>
+      </div>
+    </div>
+
+    <div class="legend-card">
+      <h4>File Management</h4>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#1e4a80;"></div>
+        <p><strong>Add to Export</strong> — Queues the selected file for the next OpenAI request.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0B2545;"></div>
+        <p><strong>Save to PC</strong> — Downloads the selected file from SD to your computer.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#f5e9c0;border:1px solid #b8721a;"></div>
+        <p><strong>Delete File</strong> — Permanently removes file from SD card (irreversible).</p>
+      </div>
+    </div>
+
+    <div class="legend-card">
+      <h4>Analysis & Export</h4>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0B2545;border:1px solid #C9A227;"></div>
+        <p><strong>Send to OpenAI</strong> — Submits image + audio prompt to GPT-4 Vision / Whisper API.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0B2545;border:1px solid #C9A227;"></div>
+        <p><strong>Replay TTS</strong> — Replays the last Text-to-Speech response via speaker.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0B2545;"></div>
+        <p><strong>Export Package</strong> — Downloads a ZIP with image, audio, and analysis text.</p>
+      </div>
+    </div>
+
+    <div class="legend-card">
+      <h4>Workflow Tips</h4>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#c9a227;"></div>
+        <p>Follow the <strong>Pairing Workflow</strong> banner: Capture → Export → Send.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#c9a227;"></div>
+        <p>Up to <strong>5 images</strong> can be queued simultaneously for multi-image GPT-4 Vision analysis.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#c9a227;"></div>
+        <p>Analysis takes <strong>60–90 seconds</strong> — the page will update automatically when complete.</p>
+      </div>
+    </div>
+
+    <div class="legend-card">
+      <h4>Hardware Notes</h4>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#1e4a80;"></div>
+        <p><strong>Camera:</strong> OV3660, 160° wide-angle, IR LEDs (GPIO 47).</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#1e4a80;"></div>
+        <p><strong>Mic:</strong> PDM on GPIO 38/39 — shares I2S_NUM_0 with camera; blocking record only.</p>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#1e4a80;"></div>
+        <p><strong>SD card:</strong> SD_MMC on GPIOs 11/12/13 — stores images, audio, and exports.</p>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /page-body -->
+
+<footer class="page-footer">
+  ESP32-S3 AI Camera Interface Guide &nbsp;|&nbsp; Developed under <span>CIJE</span> &nbsp;|&nbsp; DFRobot DFR1154
+</footer>
+
+</body>
+</html>
