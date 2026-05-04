@@ -1,4 +1,4 @@
-# Getting Started with the AI Camera
+# Getting Started with the ESP32-S3 AI Camera
 
 So you've got an ESP32-S3 AI CAM and you want to make it smart. This guide will walk you through everything step by step — no prior experience needed. If you can connect to WiFi and paste a key, you can do this.
 
