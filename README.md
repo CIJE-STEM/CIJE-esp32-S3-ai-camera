@@ -15,6 +15,25 @@ This curriculum targets the **DFRobot ESP32-S3 AI CAM**, SKU **DFR1154**.
 
 **Further reading (different stack):** [DFRobot `openai-realtime-embedded-sdk`](https://github.com/DFRobot/openai-realtime-embedded-sdk) is an **ESP-IDF** project for OpenAI’s **Realtime API** on microcontrollers. It is *not* the same as the Arduino + browser web UI flow in this guide; use it only if you are exploring that separate development path.
 
+### Pinout
+
+![DFR1154 on-board function diagram](hardware/dfrobot_ai_camera_pin_out.png)
+
+Full GPIO-to-function table (camera data lines, mic, speaker amp, ALS, SD, LED/IR/BOOT): [`hardware/dfrobot_ai_camera_pin_designations.png`](hardware/dfrobot_ai_camera_pin_designations.png).
+
+### Powering the board
+
+Two independent options — pick based on whether the board is tethered to a computer or deployed standalone:
+
+| Method | Spec | When to use |
+|--------|------|--------------|
+| **USB-C** | 5V (from computer or any USB power adapter/bank) | Programming (always required for flashing) and fine as the *only* power source for bench testing, development, or anything staying plugged into a computer/wall USB adapter. |
+| **VIN screw terminal** (green 2-pin block, silkscreened **"Power IN 5-12V"**; datasheet lists 3.7–15V DC) | External DC supply (wall adapter, battery pack, solar + battery, etc.) | Standalone/deployed operation with **no USB connection** — e.g. the squirrel-deterrent camera mounted outdoors. `+` is the DC input, `-` is GND. |
+
+You do **not** need the screw terminals if the board stays connected to a computer or a USB charger via USB-C — that alone powers it. Use the VIN terminals when it needs to run untethered.
+
+> **Servos are a separate power domain.** The camera's VIN/USB power only runs the ESP32-S3, WiFi, camera, and SD card — it does **not** power any servos. In the [`edge_ml` squirrel-deterrent example](firmware/edge_ml/examples/squirrel_deterrent/), pan/spray servos live on the ACEBOTT + PCA9685, which needs its **own** external 5–6V supply on the PCA9685 `V+` terminal, with all grounds (camera, ACEBOTT, PCA9685, servo supply) tied common. See that example's [HOWTO.md](firmware/edge_ml/examples/squirrel_deterrent/HOWTO.md) for wiring.
+
 ---
 
 ## What You're Building
@@ -185,6 +204,22 @@ The camera organizes everything into folders:
 /analysis/     — AI analysis results, organized by timestamp
 ```
 
+The optional **edge ML** example sketch may also write **`/triggers/`** (JPEG snapshots when a spray event runs). See below.
+
+---
+
+## Edge ML (on-device inference)
+
+For projects that need **fast, on-board** vision (no cloud round trip), this repo includes an Arduino library under **[`firmware/edge_ml/`](firmware/edge_ml/)**.
+
+- **Camera + SD pins** match the DFR1154 layout used in **`ESP32_AI_Camera_v3_2_5`** (same JPEG / SVGA defaults).
+- **`edge_ml_api`** is a small hook for **TensorFlow Lite / Edge Impulse** style models; the default build ships a **stub** so sketches compile until you drop in a trained model.
+- **Optional HTTP** **`/dash`** (calibration + arm/disarm + live status), **`/stream`**, and **`/capture`** so you can aim the camera and tune NVS-backed settings over WiFi (same `/stream` polling pattern as the main firmware).
+- **Example:** [`firmware/edge_ml/examples/squirrel_deterrent/`](firmware/edge_ml/examples/squirrel_deterrent/) — reference pan/spray logic, SD trigger photos, and a **HOWTO** for wiring and Edge Impulse.
+- **Board settings:** same DFR1154 hardware as the standalone firmware, so use the same board settings table [above](#for-advanced-users--instructors).
+
+Full toolchain notes, Impulse integration outline, and camera/HTTP sharing rules: **[`firmware/edge_ml/README.md`](firmware/edge_ml/README.md)**.
+
 ---
 
 ## For Advanced Users / Instructors
@@ -193,7 +228,31 @@ If you want to skip the web flasher and use Arduino IDE instead:
 
 1. Open `firmware/standalone/ai_camera_unified_3.0.0/ai_camera_unified_3.0.0.ino` in Arduino IDE (or the sketch folder for the version you are shipping)
 2. Install the **ArduinoJson** library (Tools > Manage Libraries)
-3. Board settings: ESP32S3 Dev Module, USB CDC On Boot: Enabled, Flash: 16MB, Partition: 16M Flash (3MB APP/9.9MB FATFS), PSRAM: OPI PSRAM
+3. Board settings — these apply to **every sketch in this repo** (standalone firmware and the `edge_ml` examples alike), since they're all the same DFR1154 ESP32-S3 board:
+
+   | Setting | Value |
+   |---------|-------|
+   | Board | **ESP32S3 Dev Module** |
+   | USB CDC On Boot | **Enabled** |
+   | CPU Frequency | **240MHz (WiFi)** |
+   | Core Debug Level | **None** |
+   | USB DFU On Boot | **Disabled** |
+   | Erase All Flash Before Sketch Upload | **Disabled** |
+   | Events Run On | **Core 1** |
+   | Flash Mode | **QIO 80MHz** |
+   | Flash Size | **16MB (128Mb)** |
+   | JTAG Adapter | **Disabled** |
+   | Arduino Runs On | **Core 1** |
+   | USB Firmware MSC On Boot | **Disabled** |
+   | Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** |
+   | PSRAM | **OPI PSRAM** |
+   | Upload Mode | **UART0 / Hardware CDC** |
+   | Upload Speed | **921600** |
+   | USB Mode | **Hardware CDC and JTAG** |
+   | Zigbee Mode | **Disabled** |
+
+   ![Arduino IDE board settings](media/esp32s3%20settings.jpg)
+
 4. Upload. The setup portal will handle WiFi and API key configuration — no code editing needed.
 
 To build binaries for the hosted web flasher: use **Sketch > Export Compiled Binary** in Arduino IDE, then place the exported `.bin` files (and matching bootloader/partitions if your package uses them) into the appropriate folder under [`web_flasher/`](web_flasher/) following the README inside that package, or upload them to the hosting location your class link uses.
