@@ -85,12 +85,11 @@ These steps are intentionally high level; follow Edge Impulse’s current **ESP3
 - Call `server.handleClient()` **before** `esp_camera_fb_get()` in `loop()`, or ensure you never hold a frame across `handleClient()`.
 - Do not block for long periods while holding a frame (bad for stream and watchdog).
 
-The squirrel example follows this order for the local-ML loop. The **cloud AI review** path is the one deliberate
-exception: `dfr1154_cloud_review_capture_and_evaluate()` holds the frame across an HTTPS round trip (typically
-1–6 seconds) so it can send the exact bytes it captured. During that window `server.handleClient()` isn't called,
-so `/stream` polls and dashboard buttons pause briefly on a motion event, capture-timer tick, or "Evaluate now" —
-requests queue and resume once the call returns, they aren't dropped. Keep *Enable cloud AI calls* off if you need
-an uninterrupted live view.
+The squirrel example follows this order for the local-ML loop. The **cloud AI review** path copies the captured
+JPEG into PSRAM, returns the frame right away, and runs the HTTPS call (several seconds) in a background FreeRTOS
+task. `loop()` applies the verdict in `dfr1154_cloud_review_service()`, so the stream, dashboard buttons, pan and spray
+stay responsive while the AI works. A photo taken while a call is running waits in a one-slot queue (newest wins)
+and is evaluated next.
 
 ---
 

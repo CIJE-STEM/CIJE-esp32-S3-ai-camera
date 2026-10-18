@@ -9,6 +9,33 @@ static DashboardPanCallback g_pan_cb;
 static DashboardSprayCallback g_spray_cb;
 static WebServer* g_srv;
 
+// One cloud call at a time runs in a background task, because an HTTPS round
+// trip (several seconds with model thinking) used to block loop() and with it
+// the dashboard, pan and spray. The task only fills `result`; loop() applies it
+// in dfr1154_cloud_review_service(), so review state, SD and servos are only
+// ever touched from loop().
+struct CloudJob {
+  CloudMlConfig cfg;      // copied at start; the dashboard may edit g_cfg meanwhile
+  uint8_t* jpeg;          // PSRAM copy, so the camera frame is released at once
+  size_t jpeg_len;
+  char path[72];
+  char source[16];
+  CloudMlResult result;
+};
+static CloudJob s_job;
+static volatile bool s_job_running;  // set by loop(), cleared by loop() after apply
+static volatile bool s_job_done;     // set by the task when result is ready
+
+// A photo taken while a call is running waits here (newest wins) and is
+// evaluated as soon as the current call finishes, so no capture skips review.
+struct QueuedPhoto {
+  uint8_t* jpeg;
+  size_t jpeg_len;
+  char path[72];
+  char source[16];
+};
+static QueuedPhoto s_next;
+
 static String json_escape_min(const String& in) {
   String out;
   out.reserve(in.length() + 4);
@@ -128,6 +155,38 @@ void dfr1154_cloud_review_init(DashboardState* dash_state, DashboardPanCallback 
   memset(&g_review, 0, sizeof(g_review));
 }
 
+static void cloud_job_task(void*) {
+  camera_fb_t fb = {};
+  fb.buf = s_job.jpeg;
+  fb.len = s_job.jpeg_len;
+  fb.format = PIXFORMAT_JPEG;
+  cloud_ml_classify_fb(&s_job.cfg, &fb, &s_job.result);
+  __atomic_store_n(&s_job_done, true, __ATOMIC_RELEASE);
+  vTaskDelete(nullptr);
+}
+
+/** Start the background call for a JPEG copy (takes ownership of `jpeg`). */
+static void start_job(uint8_t* jpeg, size_t len, const char* path, const char* src) {
+  s_job.jpeg = jpeg;
+  s_job.jpeg_len = len;
+  s_job.cfg = g_cfg;
+  s_job.result = CloudMlResult();
+  strncpy(s_job.path, path, sizeof(s_job.path) - 1);
+  s_job.path[sizeof(s_job.path) - 1] = '\0';
+  strncpy(s_job.source, src, sizeof(s_job.source) - 1);
+  s_job.source[sizeof(s_job.source) - 1] = '\0';
+
+  s_job_done = false;
+  s_job_running = true;
+  // TLS handshake needs a big stack. Core 0, priority 1: off loop()'s core.
+  if (xTaskCreatePinnedToCore(cloud_job_task, "cloud_ai", 16384, nullptr, 1, nullptr, 0) != pdPASS) {
+    Serial.println("[cloud] task create failed — skipping AI review");
+    free(s_job.jpeg);
+    s_job.jpeg = nullptr;
+    s_job_running = false;
+  }
+}
+
 void dfr1154_cloud_review_capture_and_evaluate(const char* source) {
   const char* src = (source && source[0]) ? source : "manual";
 
@@ -136,25 +195,48 @@ void dfr1154_cloud_review_capture_and_evaluate(const char* source) {
 
   char path[72];
   bool saved = dfr1154_dataset_capture_fb(fb, src, path, sizeof(path));
-  if (!saved) {
+  if (!saved || !g_cfg.eval_enabled) {
+    // Cloud AI off (or SD failed) — behaves exactly like a plain dataset capture.
     esp_camera_fb_return(fb);
     return;
   }
-
-  if (!g_cfg.eval_enabled) {
-    // Cloud AI is off — behaves exactly like a plain dataset capture.
+  uint8_t* copy = (uint8_t*)ps_malloc(fb->len);
+  if (!copy) {
+    Serial.println("[cloud] no PSRAM for JPEG copy — skipping AI review");
     esp_camera_fb_return(fb);
     return;
   }
-
-  CloudMlResult result;
-  cloud_ml_classify_fb(&g_cfg, fb, &result);
+  memcpy(copy, fb->buf, fb->len);
+  size_t len = fb->len;
   esp_camera_fb_return(fb);
 
+  if (!s_job_running) {
+    start_job(copy, len, path, src);
+    return;
+  }
+  if (s_next.jpeg) {
+    Serial.printf("[cloud] replacing queued %s with newer photo\n", s_next.path);
+    free(s_next.jpeg);
+  }
+  s_next.jpeg = copy;
+  s_next.jpeg_len = len;
+  strncpy(s_next.path, path, sizeof(s_next.path) - 1);
+  s_next.path[sizeof(s_next.path) - 1] = '\0';
+  strncpy(s_next.source, src, sizeof(s_next.source) - 1);
+  s_next.source[sizeof(s_next.source) - 1] = '\0';
+  Serial.printf("[cloud] busy — queued %s for AI review\n", path);
+}
+
+void dfr1154_cloud_review_service() {
+  if (!s_job_running || !__atomic_load_n(&s_job_done, __ATOMIC_ACQUIRE)) return;
+  free(s_job.jpeg);
+  s_job.jpeg = nullptr;
+  const CloudMlResult& result = s_job.result;
+
   g_review.has_pending = true;
-  strncpy(g_review.path, path, sizeof(g_review.path) - 1);
+  strncpy(g_review.path, s_job.path, sizeof(g_review.path) - 1);
   g_review.path[sizeof(g_review.path) - 1] = '\0';
-  strncpy(g_review.source, src, sizeof(g_review.source) - 1);
+  strncpy(g_review.source, s_job.source, sizeof(g_review.source) - 1);
   g_review.source[sizeof(g_review.source) - 1] = '\0';
   g_review.evaluated_at_ms = millis();
   g_review.last_result = result;
@@ -162,12 +244,19 @@ void dfr1154_cloud_review_capture_and_evaluate(const char* source) {
   g_review.confirmed_by[0] = '\0';
 
   dfr1154_dataset_write_meta(
-      path, build_meta_json(src, result, "", "", g_review.evaluated_at_ms, 0));
+      s_job.path, build_meta_json(s_job.source, result, "", "", g_review.evaluated_at_ms, 0));
 
   if (result.ok && result.is_squirrel && g_cfg.auto_confirm &&
       result.confidence >= g_cfg.confidence_threshold) {
     bool centered = false, sprayed = false;
     do_confirm("squirrel", true, true, "auto", &centered, &sprayed);
+  }
+  s_job_running = false;
+
+  if (s_next.jpeg) {
+    QueuedPhoto q = s_next;
+    s_next.jpeg = nullptr;
+    start_job(q.jpeg, q.jpeg_len, q.path, q.source);
   }
 }
 
@@ -190,6 +279,10 @@ static String build_status_json() {
   j += (g_cfg.openai_api_key.length() >= 10) ? F("true") : F("false");
   j += F(",\"anthropic_key_set\":");
   j += (g_cfg.anthropic_api_key.length() >= 10) ? F("true") : F("false");
+  j += F(",\"evaluating\":");
+  j += s_job_running ? F("true") : F("false");
+  j += F(",\"queued\":");
+  j += s_next.jpeg ? F("true") : F("false");
   j += F(",\"pending\":");
   j += g_review.has_pending ? F("true") : F("false");
   j += F(",\"path\":\"");

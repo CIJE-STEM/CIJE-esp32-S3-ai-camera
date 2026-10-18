@@ -32,11 +32,18 @@ void dfr1154_cloud_review_init(DashboardState* dash_state,
  * (if armed) sprays immediately, same as a human clicking "Confirm squirrel".
  *
  * Safe to call when SD is not mounted or cloud eval is disabled (no-ops the
- * relevant parts). Blocking: a cloud call can take a few seconds.
+ * relevant parts). Returns right after saving the photo: the cloud call runs
+ * in a background task, and the result is applied by
+ * dfr1154_cloud_review_service(). If a call is already running, the photo
+ * waits in a one-slot queue (newest wins) and is evaluated next.
  *
  * @param source short tag: "motion", "timer", or "manual".
  */
 void dfr1154_cloud_review_capture_and_evaluate(const char* source);
+
+/** Call often from loop(): applies a finished background cloud result
+ *  (review state, sidecar JSON, auto-confirm pan/spray). */
+void dfr1154_cloud_review_service();
 
 /** Register the /api/cloud/* routes. Call once alongside dfr1154_dashboard_register. */
 void dfr1154_cloud_review_register(WebServer& server);

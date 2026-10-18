@@ -626,7 +626,7 @@ function tagCurrent(label){
       else alert('Tag failed');
     });
 }
-let cloudFormFilled=false;
+let cloudFormFilled=false, liveAwaitAi=false;
 function fillCloudForm(j){
   document.getElementById('cloud_provider').value=j.provider;
   document.getElementById('cloud_eval_enabled').checked=!!j.eval_enabled;
@@ -662,10 +662,11 @@ function evaluateNow(){
   const v=document.getElementById('cloud_verdict');
   v.textContent='Capturing + evaluating\u2026 (a few seconds)';
   liveMsg('Taking photo + asking AI\u2026');
+  liveAwaitAi=true;
   fetch('/api/cloud/evaluate',{method:'POST'}).then(r=>r.json()).then(j=>{
     renderCloudStatus(j);
-    liveMsg('AI: '+v.textContent+' (confirm in AI squirrel review below)');
-  }).catch(e=>{ v.textContent='Evaluate failed: '+e; liveMsg(v.textContent); });
+    if(j.evaluating||j.queued) setTimeout(pollCloudStatus,1000);
+  }).catch(e=>{ liveAwaitAi=false; v.textContent='Evaluate failed: '+e; liveMsg(v.textContent); });
 }
 function cloudConfirm(decision){
   const p=new URLSearchParams();
@@ -692,7 +693,9 @@ function renderCloudStatus(j){
     wrap.style.display='none';
   }
   let verdict;
-  if(!j.path){
+  if(j.evaluating||j.queued){
+    verdict='Asking AI\u2026'+(j.queued?' (another photo is waiting)':'');
+  } else if(!j.path){
     verdict='No photo evaluated yet.';
   } else if(j.pending){
     if(!j.ai_ok){
@@ -705,6 +708,10 @@ function renderCloudStatus(j){
     verdict='Archived as '+j.decision+' ('+j.confirmed_by+')';
   }
   document.getElementById('cloud_verdict').textContent=verdict;
+  if(liveAwaitAi && !j.evaluating && !j.queued){
+    liveAwaitAi=false;
+    liveMsg('AI: '+verdict+' (confirm in AI squirrel review below)');
+  }
 }
 function pollCloudStatus(){
   fetch('/api/cloud/status').then(r=>r.json()).then(j=>renderCloudStatus(j)).catch(()=>{});

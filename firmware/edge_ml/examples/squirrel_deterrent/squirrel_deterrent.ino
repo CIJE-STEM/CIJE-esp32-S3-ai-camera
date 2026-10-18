@@ -207,6 +207,7 @@ void loop() {
   if (sd_ok) {
     dfr1154_dataset_service();  // background delete after "Delete all"
   }
+  dfr1154_cloud_review_service();  // apply a finished background AI verdict
 
   if (!dfr1154_camera_ok()) {
     static uint32_t s_http_grace_ms;
