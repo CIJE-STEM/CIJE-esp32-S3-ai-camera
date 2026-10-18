@@ -1,2 +1,9 @@
 .DS_Store
 Thumbs.db
+
+# Edge ML example — local WiFi credentials (copy from wifi_secrets.h.example)
+firmware/edge_ml/examples/squirrel_deterrent/wifi_secrets.h
+
+# Optional vendored Edge Impulse / large model artifacts
+firmware/edge_ml/src/ei_generated/
+*.tflite
